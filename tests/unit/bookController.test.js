@@ -1,10 +1,22 @@
-import { addBook } from '../../src/api/controllers/booksController.js';
-import Book from '../../src/api/models/Book.js'; // Mock this model
-import { ValidationError, DatabaseError } from '../../src/utils/customErrors.js';
-import logger from '../../src/utils/logger.js';
+import { addBook } from '../../src/api/controllers/booksController';
+import Book from '../../src/api/models/Book';
+import { ValidationError, DatabaseError } from '../../src/utils/customErrors';
+import logger from '../../src/utils/logger';
 
 // Mock external modules and services
-jest.mock('../../src/api/models/Book');
+jest.mock('../../src/api/models/Book', () => ({
+    __esModule: true, // This tells Jest to handle this as an ES module
+    default: jest.fn().mockImplementation(() => ({
+        save: jest.fn().mockResolvedValue({
+            _id: '1',
+            title: 'Test Book',
+            author: '123',
+            topic: 'Fiction',
+            year: 2021,
+            availability: true
+        })
+    }))
+}));
 jest.mock('../../src/utils/logger');
 
 describe('addBook Controller', () => {
@@ -15,7 +27,10 @@ describe('addBook Controller', () => {
             topic: 'Fiction',
             year: 2021,
             availability: true
-        }
+        },
+        originalUrl: '/books/add',
+        method: 'POST',
+        ip: '127.0.0.1'
     });
 
     const mockResponse = () => {
@@ -28,61 +43,83 @@ describe('addBook Controller', () => {
     const nextFunction = jest.fn();
 
     beforeEach(() => {
-        jest.clearAllMocks(); // Clear mocks in between tests
+        jest.clearAllMocks();
     });
 
-    test('should create a new book and respond with 201 and the created book', async () => {
-        const req = mockRequest();
-        const res = mockResponse();
-
-        Book.mockImplementation(() => ({
-            save: jest.fn().mockResolvedValue({
-                _id: '1',
-                title: 'Test Book',
-                author: '123',
-                topic: 'Fiction',
-                year: 2021,
-                availability: true
-            })
-        }));
-
-        await addBook(req, res, nextFunction);
-
-        expect(res.status).toHaveBeenCalledWith(201);
-        expect(res.json).toHaveBeenCalled();
-        expect(res.json.mock.calls[0][0]).toEqual({
+    it('should create a new book and respond with 201 and the created book', async () => {
+        const bookDetails = {
             _id: '1',
             title: 'Test Book',
             author: '123',
             topic: 'Fiction',
             year: 2021,
             availability: true
+        };
+    
+        Book.mockImplementation(() => {
+            const instance = {
+                save: jest.fn().mockResolvedValue(bookDetails)
+            };
+            return instance;
         });
-    });
-
-    test('should handle validation errors and call next with ValidationError', async () => {
+    
         const req = mockRequest();
-        const error = new Error('Validation error');
-        error.name = 'ValidationError';
+        const res = mockResponse();
+    
+        await addBook(req, res, nextFunction);
+    
+        expect(res.status).toHaveBeenCalledWith(201);
+        expect(res.json).toHaveBeenCalledWith(bookDetails);
+    });
+    
+    it('should handle validation errors and call next with ValidationError', async () => {
+        const validationError = new Error('Validation error');
+        validationError.name = 'ValidationError';
+
         Book.mockImplementation(() => ({
-            save: jest.fn().mockRejectedValue(error)
+            save: jest.fn().mockRejectedValue(validationError)
         }));
 
-        await addBook(req, mockResponse(), nextFunction);
+        const req = mockRequest();
+        const res = mockResponse();
+
+        await addBook(req, res, nextFunction);
+
         expect(nextFunction).toHaveBeenCalledWith(expect.any(ValidationError));
+        expect(logger.error).toHaveBeenCalled();
     });
 
-    test('should handle duplicate key errors and call next with DatabaseError', async () => {
-        const req = mockRequest();
-        const error = new Error('Duplicate key error');
-        error.name = 'MongoError';
-        error.code = 11000;
+    it('should handle duplicate key errors and call next with DatabaseError', async () => {
+        const mongoError = new Error('Duplicate key error');
+        mongoError.name = 'MongoError';
+        mongoError.code = 11000;
 
         Book.mockImplementation(() => ({
-            save: jest.fn().mockRejectedValue(error)
+            save: jest.fn().mockRejectedValue(mongoError)
         }));
 
-        await addBook(req, mockResponse(), nextFunction);
+        const req = mockRequest();
+        const res = mockResponse();
+
+        await addBook(req, res, nextFunction);
+
         expect(nextFunction).toHaveBeenCalledWith(expect.any(DatabaseError));
+        expect(logger.error).toHaveBeenCalled();
+    });
+
+    it('should handle other errors and call next', async () => {
+        const genericError = new Error('Generic error');
+
+        Book.mockImplementation(() => ({
+            save: jest.fn().mockRejectedValue(genericError)
+        }));
+
+        const req = mockRequest();
+        const res = mockResponse();
+
+        await addBook(req, res, nextFunction);
+
+        expect(nextFunction).toHaveBeenCalledWith(genericError);
+        expect(logger.error).toHaveBeenCalled();
     });
 });
