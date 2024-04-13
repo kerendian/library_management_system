@@ -16,10 +16,10 @@ router.get('/books/:id', getBook);
 // GET request to search a book
 router.get('/books/search', passport.authenticate('basic', { session: false }), searchBooks);
 
-// POST request to loan a specific book by ID (Protected)
+// PUT request to loan a specific book by ID (Protected)
 router.put('/books/:id/loan', passport.authenticate('basic', { session: false }), loanBook);
 
-// POST request to return a specific book by ID (Protected)
+// PUT request to return a specific book by ID (Protected)
 router.put('/books/:id/return', passport.authenticate('basic', { session: false }), returnBook);
 
 // PUT request to update a specific book by ID (Protected)
