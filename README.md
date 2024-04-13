@@ -49,6 +49,11 @@ npm start
 
 For detailed API documentation, refer to the API routes defined in the project.
 
+## Testing
+
+- Run unit tests using a testing framework like Jest or Mocha.
+- Execute tests using `npm test`.
+
 ## Libraries Used
 
 - Express.js: Web framework for Node.js
